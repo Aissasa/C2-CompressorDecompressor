@@ -1,14 +1,15 @@
 /*
 	Written By Aissa Ben Zayed
 
-	Compressor project: This program takes in a text file that contains vertices,
-	extracts the x, y and z coordinates, compresses them and put them in a binary file.
+	Decompresser project: This program takes in a binary that contains compressed data,
+	extracts the data, decompresses it and then compares it to the original data.
 */
 
 /*-------------------------------------------Includes-------------------------------------------*/
 #include "stdio.h"
 #include "stdlib.h"
 #include "Math.h"
+#include "String.h"
 #include "Main.h"
 
 
@@ -16,10 +17,23 @@
 int main(int argc, char * argv[])
 {
 	/*----------------------Variables Declaration----------------------*/
+	// get the number of bits
+	char compressionBits;
+	if (argc == 2)
+	{
+		compressionBits = atoi(argv[1]);
+	}
+	else if (argc > 2)
+	{
+		compressionBits = MIN_COMPRESSION_BITS;
+		printf("Too many arguments supplied.\n");
+	}
+	else
+	{
+		compressionBits = MIN_COMPRESSION_BITS;
+		printf("One argument expected.\n");
+	}
 
-
-
-	/*-------------------------Retrieving Data--------------------------*/
 
 	// read original data and put it in a linked list
 	CoordinatesNode_t * originalDataHead = readOriginalData();
@@ -37,12 +51,21 @@ int main(int argc, char * argv[])
 	// read the header of the compressed data file
 	// read data and decompress it and put it in a linked list
 	Header_t header;
-	SlotNode_t * slotsListHead = decompressData(&header);
+	unsigned int compressedDataFileSize = 0;
+	SlotNode_t * slotsListHead = decompressData(&header, &compressedDataFileSize, compressionBits);
 
 	// decompress the decoded data
 	CoordinatesNode_t * decompressedDataHead = decodeData(slotsListHead, &header);
 
 	// compare old data with new data
+	float rmsError = calculateRMSError(originalDataHead, decompressedDataHead);
+#if DEBUG
+	printf("\nRMS Error is: %f", rmsError);
+
+#endif // DEBUG
+
+	// write the data to the csv file
+	writeToStatsFile(header, rmsError, compressedDataFileSize);
 
 	return 0;
 
@@ -111,7 +134,7 @@ void pushNewSlotNode(SlotNode_t * headNode, short slot)
 	currentNode->nextNode = newNode;
 }
 
-
+/*-------------------------------Reading Original data functions----------------------------------*/
 
 CoordinatesNode_t * readOriginalData()
 {
@@ -145,10 +168,22 @@ CoordinatesNode_t * readOriginalData()
 	return head;
 }
 
+/*-----------------------------------Decompression functions--------------------------------------*/
 
-SlotNode_t * decompressData(Header_t* header)
+SlotNode_t * decompressData(Header_t* header, unsigned int* compressedDataFileSize, char compressionBits)
 {
-	FILE * compressedDataFile = fopen(COMPRESSED_DATA_FILE, "rb");
+	// build the file name
+	char fileName[30] = COMPRESSED_DATA_FILE;
+	char bitsBuffer[5];
+
+	sprintf(bitsBuffer, "%d", compressionBits);
+
+	strcat(fileName, bitsBuffer);
+	strcat(fileName, DOT_BIN);
+
+	FILE * compressedDataFile = fopen(fileName, "rb");
+
+	*compressedDataFileSize = GetFileSize(compressedDataFile);
 
 	// get header
 	*header = readHeader(compressedDataFile);
@@ -192,9 +227,6 @@ SlotNode_t * decompressData(Header_t* header)
 
 		if (bs.currentBit >= header->numberOfCompressionBits)
 		{
-#if DEBUG
-			printf("%d\n", bs.data);
-#endif // DEBUG
 
 			if (slotsListHead == NULL)
 			{
@@ -222,6 +254,15 @@ SlotNode_t * decompressData(Header_t* header)
 	return slotsListHead;
 }
 
+unsigned int GetFileSize(FILE* compressedDataFile)
+{
+	fseek(compressedDataFile, 0, SEEK_END); // seek to end of file
+	unsigned int size = ftell(compressedDataFile); // get current file pointer
+	fseek(compressedDataFile, 0, SEEK_SET); // seek back to beginning of file
+
+	return size;
+}
+
 Header_t readHeader(FILE * compressedDataFile)
 {
 	Header_t header;
@@ -244,6 +285,7 @@ Header_t readHeader(FILE * compressedDataFile)
 	return header;
 }
 
+/*--------------------------------------Decoding functions----------------------------------------*/
 
 CoordinatesNode_t * decodeData(SlotNode_t * slotsListHead, Header_t* header)
 {
@@ -289,18 +331,19 @@ CoordinatesNode_t * decodeData(SlotNode_t * slotsListHead, Header_t* header)
 				printf("\nDecoded numbers: %f, %f, %f\n", coor.x, coor.y, coor.z);
 #endif // DEBUG
 
-				break;
-			
-			default:
-
 				if (decodedDataHead == NULL)
 				{
-					createNewCoorNode(coor);
+					decodedDataHead = createNewCoorNode(coor);
 				}
 				else
 				{
 					pushNewCoorNode(decodedDataHead, coor);
 				}
+
+				break;
+
+			default:
+
 				coor = { 0, 0, 0 };
 				counter = 0;
 
@@ -311,5 +354,63 @@ CoordinatesNode_t * decodeData(SlotNode_t * slotsListHead, Header_t* header)
 	return decodedDataHead;
 
 }
+
+/*------------------------------------RMS Error functions-----------------------------------------*/
+
+float calculateRMSError(CoordinatesNode_t* originalDataHead, CoordinatesNode_t* decompressedDataHead)
+{
+	CoordinatesNode_t* currentOriginalData = originalDataHead;
+	CoordinatesNode_t* currentDecompressedData = decompressedDataHead;
+
+	float square = 0;
+	int counter = 0;
+
+	while (currentOriginalData != NULL)
+	{
+		square += (float)pow((double)currentOriginalData->coordinates.x - (double)currentDecompressedData->coordinates.x, 2);
+		square += (float)pow((double)currentOriginalData->coordinates.y - (double)currentDecompressedData->coordinates.y, 2);
+		square += (float)pow((double)currentOriginalData->coordinates.z - (double)currentDecompressedData->coordinates.z, 2);
+
+		counter += 3;
+
+		currentOriginalData = currentOriginalData->nextNode;
+		currentDecompressedData = currentDecompressedData->nextNode;
+	}
+
+	return sqrtf(square / counter);
+}
+
+/*-----------------------------------Write Stats functions-----------------------------------------*/
+
+void writeToStatsFile(Header_t header, float rmsError, unsigned int compressedDataFileSize)
+{
+	char compressionBits = (char)header.numberOfCompressionBits;
+
+	FILE* statsFile;
+
+	if (compressionBits == 5)
+	{
+		// create a new one
+		statsFile = fopen(STATS_FILE, "w");
+
+		// add headings
+		fprintf(statsFile, "Number_Of_Bits, RMS_Error, File_Size\n");
+
+	}
+	else
+	{
+		// append to file
+		statsFile = fopen(STATS_FILE, "a+");
+	}
+
+	// output data to the file
+	fprintf(statsFile, "%d, %f, %d\n", compressionBits, rmsError, compressedDataFileSize);
+
+	fclose(statsFile);
+
+}
+
+
+
 
 

@@ -75,10 +75,15 @@ typedef struct SlotNode
 
 
 
-#define COMPRESSED_DATA_FILE "compressedData.bin"
-#define COORDINATES_FILE "coordinates.bin"
+#define COMPRESSED_DATA_FILE "../Data/compressedData"
+#define DOT_BIN ".bin"
+#define COORDINATES_FILE "../Data/coordinates.bin"
 
-#define DEBUG 1
+#define STATS_FILE "../Data/stats.csv"
+
+#define MIN_COMPRESSION_BITS 5
+
+#define DEBUG 0
 
 
 /*------------------------------------Linked lists functions-------------------------------------*/
@@ -88,11 +93,20 @@ void pushNewCoorNode(CoordinatesNode_t* headNode, Coordinates_t coordinates);
 SlotNode_t* createNewSlotNode(short slots);
 void pushNewSlotNode(SlotNode_t* headNode, short slots);
 
-
+/*-------------------------------Reading Original data functions----------------------------------*/
 CoordinatesNode_t * readOriginalData();
 
-SlotNode_t * decompressData(Header_t* header);
+/*-----------------------------------Decompression functions--------------------------------------*/
+SlotNode_t * decompressData(Header_t* header, unsigned int* compressedDataFileSize, char compressionBits);
+unsigned int GetFileSize(FILE* compressedDataFile);
 Header_t readHeader(FILE * compressedDataFile);
 
+/*--------------------------------------Decoding functions----------------------------------------*/
 CoordinatesNode_t * decodeData(SlotNode_t * slotsListHead, Header_t* header);
+
+/*------------------------------------RMS Error functions-----------------------------------------*/
+float calculateRMSError(CoordinatesNode_t* originalDataHead, CoordinatesNode_t* decompressedDataHead);
+
+/*-----------------------------------Write Stats functions-----------------------------------------*/
+void writeToStatsFile(Header_t header, float rmsError, unsigned int compressedDataFileSize);
 

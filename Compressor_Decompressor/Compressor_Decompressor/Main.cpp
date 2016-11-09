@@ -9,6 +9,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "Math.h"
+#include "String.h"
 #include "Main.h"
 
 
@@ -16,6 +17,21 @@
 int main(int argc, char * argv[])
 {
 	/*----------------------Variables Declaration----------------------*/
+	// get the number of bits
+	if (argc == 2)
+	{
+		compressionBits = atoi(argv[1]);
+	}
+	else if (argc > 2)
+	{
+		compressionBits = DEFAULT_COMPRESSION_BITS;
+		printf("Too many arguments supplied.\n");
+	}
+	else
+	{
+		compressionBits = DEFAULT_COMPRESSION_BITS;
+		printf("One argument expected.\n");
+	}
 
 	FILE * verticesFile;
 	FILE * coordinatesFile;
@@ -28,7 +44,6 @@ int main(int argc, char * argv[])
 
 	// ranges to be used for the compression
 	Ranges_t ranges;
-
 
 
 	/*-------------------------Retrieving Data--------------------------*/
@@ -106,7 +121,7 @@ int main(int argc, char * argv[])
 	ranges.zRange = ranges.maxZ - ranges.minZ;
 
 	//		calculate the max number of bytes
-	int maxNumBytes = (int)pow(2, COMPRESSION_BITS);
+	int maxNumBytes = (int)pow(2, compressionBits);
 
 	// launch the compression
 	encodeData(listHead, &ranges, maxNumBytes);
@@ -236,12 +251,21 @@ void encodeData(Node_t * listHead, Ranges_t * ranges, int maxNumBytes)
 
 void compressDataToFile(Node_t * listHead, Ranges_t * ranges, int coordinatesCounter)
 {
-	FILE * compressedVertsFile = fopen(COMPRESSED_VERTS_FILE, "wb");
+	// build the file name
+	char fileName[30] = COMPRESSED_VERTS_FILE;
+	char buffer[5];
+
+	sprintf(buffer, "%d", compressionBits);
+
+	strcat(fileName, buffer);
+	strcat(fileName, DOT_BIN);
+
+	FILE * compressedVertsFile = fopen(fileName, "wb");
 
 	writeHeader(compressedVertsFile, ranges, coordinatesCounter);
 
 	// initialize bit stream
-	Bitstream_t bs = { 0, 0, COMPRESSION_BITS };
+	Bitstream_t bs = { 0, 0, compressionBits };
 
 	Node_t * currentNode = listHead;
 
@@ -272,7 +296,7 @@ void compressDataToFile(Node_t * listHead, Ranges_t * ranges, int coordinatesCou
 
 void writeHeader(FILE * compressedVertsFile, Ranges_t * ranges, int coordinatesCounter)
 {
-	int bits = COMPRESSION_BITS;
+	int bits = compressionBits;
 	int count = coordinatesCounter * 3;
 	fwrite(&bits, sizeof(int), 1, compressedVertsFile);
 	fwrite(&count, sizeof(int), 1, compressedVertsFile);

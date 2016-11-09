@@ -59,12 +59,15 @@ typedef struct Slots
 } Slots_t;
 
 
-#define VERTICES_FILE "verts.txt"
-#define COMPRESSED_VERTS_FILE "compressedData.bin"
-#define COORDINATES_FILE "coordinates.bin"
+#define VERTICES_FILE "../Data/verts.txt"
+#define COMPRESSED_VERTS_FILE "../Data/compressedData"
+#define DOT_BIN ".bin"
+#define COORDINATES_FILE "../Data/coordinates.bin"
 
-#define COMPRESSION_BITS 6
-#define DEBUG 1
+#define DEFAULT_COMPRESSION_BITS 5
+#define DEBUG 0
+
+char compressionBits;
 
 
 /*------------------------------------Linked list functions-------------------------------------*/
