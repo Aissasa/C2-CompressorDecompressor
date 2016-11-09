@@ -20,12 +20,10 @@ typedef struct Node
 // define the ranges structure that will be used for storing data used in the compression
 typedef struct Ranges
 {
-	//mins
 	float minX;
 	float minY;
 	float minZ;
 
-	//maxs
 	float maxX;
 	float maxY;
 	float maxZ;
@@ -43,18 +41,19 @@ typedef struct Ranges
 // define the bit stream structure
 typedef struct Bitstream
 {
-	short data;
+	unsigned short data;
 	char currentBit;
 	char numberOfCompressionBits;
 
 }Bitstream_t;
 
 // define the slots structure
+//		it represents an encoded coordinate
 typedef struct Slots
 {
-	short xSlot;
-	short ySlot;
-	short zSlot;
+	unsigned short xSlot;
+	unsigned short ySlot;
+	unsigned short zSlot;
 
 } Slots_t;
 
@@ -74,6 +73,9 @@ char compressionBits;
 Node_t* createNewNode(Coordinates_t coordinates);
 void pushNewNode(Node_t* headNode, Coordinates_t coordinates);
 
+/*-------------------------------------Retrieving data functions-----------------------------*/
+Node_t* retrieveData(Ranges_t* ranges, int* coordinatesCounter);
+
 /*------------------------------------Encoding functions-------------------------------------*/
 void updateRanges(Coordinates_t* coordinates, Ranges_t* ranges);
 void encodeData(Node_t* listHead, Ranges_t* ranges, int maxNumBytes);
@@ -82,7 +84,4 @@ void encodeData(Node_t* listHead, Ranges_t* ranges, int maxNumBytes);
 void compressDataToFile(Node_t * listHead, Ranges_t * ranges, int coordinatesCounter);
 void writeHeader(FILE * compressedVertsFile, Ranges_t * ranges, int coordinatesCounter);
 void compressCurrentSlots(Slots_t* slots, Bitstream_t* bs, FILE * compressedVertsFile, bool lastCoordinates);
-void compressASlot(short slot, Bitstream_t* bs, FILE * compressedVertsFile, bool lastSlot);
-
-
-
+void compressASlot(int slot, Bitstream_t* bs, FILE * compressedVertsFile, bool lastSlot);

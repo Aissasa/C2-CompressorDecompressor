@@ -8,7 +8,7 @@ echo Decompression with %loopcount% bits
 start Decompressor.exe %loopcount%
 pause
 set /a loopcount=loopcount+1
-if %loopcount%==16 goto exitloop
+if %loopcount%==17 goto exitloop
 goto loop
 :exitloop
 pause

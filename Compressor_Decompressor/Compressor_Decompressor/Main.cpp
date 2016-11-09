@@ -2,7 +2,8 @@
 	Written By Aissa Ben Zayed
 
 	Compressor project: This program takes in a text file that contains vertices,
-	extracts the x, y and z coordinates, compresses them and put them in a binary file.
+	extracts the x, y and z coordinates, compresses them following the number of bits taken as an arg
+	and puts them in a binary file.
 */
 
 /*-------------------------------------------Includes-------------------------------------------*/
@@ -33,86 +34,21 @@ int main(int argc, char * argv[])
 		printf("One argument expected.\n");
 	}
 
-	FILE * verticesFile;
-	FILE * coordinatesFile;
-
 	// initialize the list pointer
 	Node_t* listHead = NULL;
-
-	// counter for number of coordinates
-	int coordinatesCounter = 0;
 
 	// ranges to be used for the compression
 	Ranges_t ranges;
 
+	// counter for number of coordinates
+	int coordinatesCounter = 0;
+
 
 	/*-------------------------Retrieving Data--------------------------*/
 
-	verticesFile = fopen(VERTICES_FILE, "r");
-	if (verticesFile == NULL)
-	{
-		printf("Error: file pointer is null");
-		return -1;
-	}
+	listHead = retrieveData(&ranges, &coordinatesCounter);
 
-	coordinatesFile = fopen(COORDINATES_FILE, "wb");
-	if (coordinatesFile == NULL)
-	{
-		printf("Error: file pointer is null");
-		return -1;
-	}
-
-	int id = 0;
-	Coordinates_t coor;
-
-	while (true)
-	{
-		// read the data
-		fscanf(verticesFile, "%d: %f %f %f", &id, &(coor.x), &(coor.y), &(coor.z));
-
-		// urgent write these parsed data to a file for the decompresser to compare with
-		fwrite(&coor, sizeof(coor), 1, coordinatesFile);
-
-		// push the data to the list
-		if (listHead == NULL)
-		{
-			listHead = createNewNode(coor);
-
-			//initialize mins and maxs
-			ranges.minX = ranges.maxX = coor.x;
-			ranges.minY = ranges.maxY = coor.y;
-			ranges.minZ = ranges.maxZ = coor.z;
-		}
-		else
-		{
-			pushNewNode(listHead, coor);
-
-			//check for new mins and maxs
-			updateRanges(&coor, &ranges);
-		}
-
-		// increment counter
-		coordinatesCounter++;
-
-		// go to next line
-		char eol = fgetc(verticesFile);
-		while (eol != EOF && eol != '\n')
-		{
-			eol = fgetc(verticesFile);
-		}
-
-		// if reached the end of file, exit
-		if (eol == EOF)
-		{
-			// close files
-			fclose(coordinatesFile);
-			fclose(verticesFile);
-
-			break;
-		}
-	}
-
-	/*---------------------------Compressing Data------------------------*/
+	/*---------------------------Encoding Data------------------------*/
 
 	// prepare for compression
 	//		prepare the ranges
@@ -166,6 +102,74 @@ void pushNewNode(Node_t * headNode, Coordinates_t coordinates)
 
 }
 
+/*-------------------------------------Retrieving data functions-----------------------------*/
+
+Node_t* retrieveData(Ranges_t* ranges, int* coordinatesCounter)
+{
+	FILE * verticesFile;
+	FILE * coordinatesFile;
+
+	verticesFile = fopen(VERTICES_FILE, "r");
+	coordinatesFile = fopen(COORDINATES_FILE, "wb");
+
+	Node_t* listHead = NULL;
+
+	// temporary data variables
+	int id = 0;
+	Coordinates_t coor;
+
+	while (true)
+	{
+		// read the vertices data
+		fscanf(verticesFile, "%d: %f %f %f", &id, &(coor.x), &(coor.y), &(coor.z));
+
+		// write the parsed data to a coordinates file for the decompresser to compare with
+		fwrite(&coor, sizeof(coor), 1, coordinatesFile);
+
+		// push the data to the list
+		if (listHead == NULL)
+		{
+			listHead = createNewNode(coor);
+
+			//initialize mins and maxs
+			ranges->minX = ranges->maxX = coor.x;
+			ranges->minY = ranges->maxY = coor.y;
+			ranges->minZ = ranges->maxZ = coor.z;
+		}
+		else
+		{
+			pushNewNode(listHead, coor);
+
+			//check for new mins and maxs
+			updateRanges(&coor, ranges);
+		}
+
+		// increment counter
+		(*coordinatesCounter)++;
+
+		// go to the next line
+		char eol = fgetc(verticesFile);
+		while (eol != EOF && eol != '\n')
+		{
+			eol = fgetc(verticesFile);
+		}
+
+		// if reached the end of file, exit
+		if (eol == EOF)
+		{
+			// close files
+			fclose(coordinatesFile);
+			fclose(verticesFile);
+
+			break;
+		}
+	}
+
+	return listHead;
+
+}
+
+
 /*---------------------------------------Encoding functions---------------------------------*/
 
 void updateRanges(Coordinates_t * coordinates, Ranges_t * ranges)
@@ -197,6 +201,7 @@ void updateRanges(Coordinates_t * coordinates, Ranges_t * ranges)
 	}
 }
 
+// this method encodes the retrieved data while depending on the number compression bits
 void encodeData(Node_t * listHead, Ranges_t * ranges, int maxNumBytes)
 {
 	//	calculate the step for each coordinate
@@ -210,14 +215,16 @@ void encodeData(Node_t * listHead, Ranges_t * ranges, int maxNumBytes)
 	printf("Steps: %f %f %f\n", xStep, yStep, zStep);
 #endif // DEBUG
 
+	// go through the data and encode it
 	Node_t* current = listHead;
 	while (current != NULL)
 	{
+
 #if DEBUG
 		printf("\nOld values: x: %f, y: %f, z: %f\n", current->coordinates.x, current->coordinates.y, current->coordinates.z);
 #endif // DEBUG
 
-		//get the slots the number will land on
+		// get the slots the number will land on
 		float xSlot = roundf((current->coordinates.x - ranges->minX) / xStep);
 		if (xSlot >= maxNumBytes)
 		{
@@ -269,14 +276,14 @@ void compressDataToFile(Node_t * listHead, Ranges_t * ranges, int coordinatesCou
 
 	Node_t * currentNode = listHead;
 
-	// go through all of the data and bit stream them
+	// go through all of the data and bit stream it
 	while (currentNode->nextNode != NULL)
 	{
 		// put the current node data into slots data structure
 		Slots_t slots;
-		slots.xSlot = (short)currentNode->coordinates.x;
-		slots.ySlot = (short)currentNode->coordinates.y;
-		slots.zSlot = (short)currentNode->coordinates.z;
+		slots.xSlot = (unsigned short)currentNode->coordinates.x;
+		slots.ySlot = (unsigned short)currentNode->coordinates.y;
+		slots.zSlot = (unsigned short)currentNode->coordinates.z;
 
 		compressCurrentSlots(&slots, &bs, compressedVertsFile, false);
 
@@ -284,9 +291,9 @@ void compressDataToFile(Node_t * listHead, Ranges_t * ranges, int coordinatesCou
 	}
 
 	Slots_t slots;
-	slots.xSlot = (short)currentNode->coordinates.x;
-	slots.ySlot = (short)currentNode->coordinates.y;
-	slots.zSlot = (short)currentNode->coordinates.z;
+	slots.xSlot = (unsigned short)currentNode->coordinates.x;
+	slots.ySlot = (unsigned short)currentNode->coordinates.y;
+	slots.zSlot = (unsigned short)currentNode->coordinates.z;
 
 	compressCurrentSlots(&slots, &bs, compressedVertsFile, true);
 
@@ -294,6 +301,7 @@ void compressDataToFile(Node_t * listHead, Ranges_t * ranges, int coordinatesCou
 
 }
 
+// write the compressed data file header that will store key information for the decompresser
 void writeHeader(FILE * compressedVertsFile, Ranges_t * ranges, int coordinatesCounter)
 {
 	int bits = compressionBits;
@@ -308,6 +316,7 @@ void writeHeader(FILE * compressedVertsFile, Ranges_t * ranges, int coordinatesC
 	fwrite(&ranges->maxZ, sizeof(float), 1, compressedVertsFile);
 }
 
+// go through the coordinates one by one and compress it
 void compressCurrentSlots(Slots_t* slots, Bitstream_t* bs, FILE * compressedVertsFile, bool lastCoordinates)
 {
 	// compress x
@@ -319,7 +328,8 @@ void compressCurrentSlots(Slots_t* slots, Bitstream_t* bs, FILE * compressedVert
 
 }
 
-void compressASlot(short slot, Bitstream_t* bs, FILE * compressedVertsFile, bool lastSlot)
+// bit stream an encoded coordinate
+void compressASlot(int slot, Bitstream_t* bs, FILE * compressedVertsFile, bool lastSlot)
 {
 
 	for (char i = 0; i < bs->numberOfCompressionBits; i++)
@@ -353,9 +363,3 @@ void compressASlot(short slot, Bitstream_t* bs, FILE * compressedVertsFile, bool
 
 	}
 }
-
-
-
-
-
-

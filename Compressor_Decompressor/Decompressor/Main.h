@@ -20,12 +20,10 @@ typedef struct CoordinatesNode
 // define the ranges structure that will be used for storing data used in the compression
 typedef struct Ranges
 {
-	//mins
 	float minX;
 	float minY;
 	float minZ;
 
-	//maxs
 	float maxX;
 	float maxY;
 	float maxZ;
@@ -52,23 +50,25 @@ typedef struct Header
 // define the bit stream structure
 typedef struct Bitstream
 {
-	short data;
+	unsigned short data;
 	char currentBit;
 
 }Bitstream_t;
 
 //define buffer structure
+//		it is used as a temporary vessel for data read from the compressed data file
 typedef struct Buffer
 {
-	short data;
+	unsigned short data;
 	char bitsLeft;
 
 }Buffer_t;
 
 // define the slots node structure for the linked list
+//		a slot represents an encoded coordinate
 typedef struct SlotNode
 {
-	short slot;
+	unsigned short slot;
 	struct SlotNode* nextNode;
 
 } SlotNode_t;
